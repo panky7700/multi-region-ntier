@@ -72,3 +72,56 @@ resource "azurerm_network_security_rule" "web" {
   ]
 
 }
+
+resource "azurerm_network_interface_security_group_association" "web" {
+  network_interface_id      = azurerm_network_interface.web.id
+  network_security_group_id = azurerm_network_security_group.web.id
+  depends_on                = [azurerm_network_interface.web, azurerm_network_security_group.web]
+}
+
+resource "azurerm_network_interface" "web" {
+  name                = "webnic01"
+  resource_group_name = azurerm_resource_group.group.name
+  location            = azurerm_resource_group.group.location
+
+  ip_configuration {
+    name                          = "internal"
+    subnet_id                     = azurerm_subnet.subnets[0].id
+    private_ip_address_allocation = "Dynamic"
+    public_ip_address_id          = azurerm_public_ip.web.id
+  }
+  depends_on = [azurerm_public_ip.web, azurerm_subnet.subnets]
+
+}
+
+resource "azurerm_linux_virtual_machine" "web" {
+  name                = "webvm"
+  resource_group_name = azurerm_resource_group.group.name
+  location            = azurerm_resource_group.group.location
+  size                = "Standard_B1s"
+  admin_username      = "Dell"
+  network_interface_ids = [
+    azurerm_network_interface.web.id,
+  ]
+
+  admin_ssh_key {
+    username   = "Dell"
+    public_key = file("~/.ssh/id_rsa.pub")
+  }
+
+  os_disk {
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  }
+
+  # urn is unique id number
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts"
+    version   = "latest"
+
+  }
+  # custom_data = base64encode("./install.sh")
+
+}
